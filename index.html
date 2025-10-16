@@ -4,24 +4,39 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Demo Placar ao Vivo — LOTECA</title>
+  <meta name="description" content="Demo de placar ao vivo para lotecaonline.com.br com atualização automática.">
   <style>
     :root { font-family: system-ui, Roboto, Arial, sans-serif; }
     body { margin: 0; background: #0f172a; color: #e2e8f0; }
+    a { color: #93c5fd; }
+
     .topbar { display:flex; gap:.75rem; align-items:center; padding:16px 20px; background:#111827; border-bottom:1px solid #1f2937; }
     h1 { margin:0; font-size:1.25rem; }
     .badge { background:#1d4ed8; padding:2px 8px; border-radius:999px; font-size:.75rem; }
+
     .card { margin:20px; padding:16px; background:#111827; border:1px solid #1f2937; border-radius:16px; }
-    .iframe-wrap { position:relative; padding-top:56.25%; border-radius:12px; overflow:hidden; border:1px solid #1f2937; }
-    .iframe-wrap iframe { position:absolute; inset:0; width:100%; height:100%; border:0; background:#0b1022; }
+    .note { opacity:.85; margin:.5rem 0 1rem; }
+
+    .btn {
+      display:inline-block; padding:10px 14px; border-radius:10px;
+      border:1px solid #1f2937; background:#1d4ed8; color:#fff;
+      text-decoration:none; font-weight:600;
+    }
+    .btn:hover { filter:brightness(1.05); }
+
     .matches { list-style:none; padding:0; margin:0; display:grid; gap:12px; }
-    .match { display:flex; justify-content:space-between; align-items:center; padding:12px 14px; background:#0b1220; border:1px solid #1f2937; border-radius:12px; }
+    .match { display:flex; justify-content:space-between; align-items:center; gap:10px;
+             padding:12px 14px; background:#0b1220; border:1px solid #1f2937; border-radius:12px; }
     .team { display:flex; gap:8px; align-items:center; }
     .team .name { font-weight:600; }
-    .score { font-size:1.25rem; font-weight:700; }
-    .status { font-size:.85rem; opacity:.8; }
-    .last-update { margin-top:10px; font-size:.85rem; opacity:.7; }
+    .score { font-size:1.25rem; font-weight:700; min-width:72px; text-align:center; }
+    .status { font-size:.85rem; opacity:.85; }
+    .last-update { margin-top:10px; font-size:.85rem; opacity:.75; }
     .footer { padding:20px; text-align:center; opacity:.7; }
-    @media (min-width:700px){ .matches { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+
+    @media (min-width:700px){
+      .matches { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    }
   </style>
 </head>
 <body>
@@ -30,20 +45,20 @@
     <span class="badge">versão demo</span>
   </header>
 
+  <!-- Sem iframe: cartão limpo com CTA para abrir o site oficial -->
   <section class="card">
-    <h2>Embed do site atual</h2>
-    <div class="iframe-wrap">
-      <iframe
-        src="https://www.lotecaonline.com.br/"
-        loading="lazy"
-        referrerpolicy="no-referrer"
-        title="Placar ao vivo - site do cliente"></iframe>
-    </div>
+    <h2>Placar oficial</h2>
     <p class="note">
-      *Se o site bloquear embed, veja a lista abaixo (fallback simulado).
+      O site oficial não permite ser exibido dentro de outros sites. Clique abaixo para abrir em nova aba:
+    </p>
+    <p>
+      <a class="btn" href="https://www.lotecaonline.com.br/" target="_blank" rel="noopener">
+        Abrir placar oficial
+      </a>
     </p>
   </section>
 
+  <!-- Lista que será atualizada pelo JS (mock ou API) -->
   <section class="card">
     <h2>Lista de partidas (Atualiza a cada 30s)</h2>
     <ul id="matches" class="matches"></ul>
@@ -56,15 +71,18 @@
 
   <script>
     // ===== CONFIG =====
-    const USE_WORKER = false; // quando tiver um Worker/API, troque para true
-    const WORKER_URL = "https://SEU-WORKER.cloudflare.workers.dev/placar"; // ajuste
+    // Quando tiver um endpoint (Cloudflare Worker/API), defina USE_WORKER = true
+    // e coloque a URL no WORKER_URL.
+    const USE_WORKER = false;
+    const WORKER_URL = "https://SEU-WORKER.cloudflare.workers.dev/placar"; // ajuste quando for usar API
     const REFRESH_MS = 30_000;
 
     // ===== MOCK (para demo imediata) =====
     const mock = [
-      { home:"Time A", away:"Time B", scoreHome:1, scoreAway:0, minute:"34'", status:"1ºT" },
-      { home:"Time C", away:"Time D", scoreHome:2, scoreAway:2, minute:"INT", status:"Intervalo" },
-      { home:"Time E", away:"Time F", scoreHome:0, scoreAway:0, minute:"—", status:"Hoje 20:00" },
+      { home:"Flamengo-RJ", away:"Palmeiras-SP", scoreHome:1, scoreAway:0, minute:"34'", status:"1ºT" },
+      { home:"Internacional-RS", away:"Sport-PE", scoreHome:0, scoreAway:0, minute:"INT", status:"Intervalo" },
+      { home:"Corinthians-SP", away:"Atlético-MG", scoreHome:2, scoreAway:2, minute:"—", status:"Final" },
+      { home:"Cruzeiro-MG", away:"Fortaleza-CE", scoreHome:0, scoreAway:0, minute:"—", status:"Hoje 20:00" }
     ];
 
     const elList = document.getElementById("matches");
@@ -79,7 +97,7 @@
           <div class="team"><span class="name">${m.home}</span></div>
           <div class="score">${m.scoreHome} - ${m.scoreAway}</div>
           <div class="team"><span class="name">${m.away}</span></div>
-          <div class="status">${m.status} ${m.minute ? "• "+m.minute : ""}</div>
+          <div class="status">${m.status}${m.minute ? " • " + m.minute : ""}</div>
         `;
         elList.appendChild(li);
       });
@@ -90,7 +108,7 @@
       try{
         if (USE_WORKER) {
           const res = await fetch(WORKER_URL, { cache:"no-store" });
-          const data = await res.json(); // formato: [{home,away,scoreHome,scoreAway,minute,status}]
+          const data = await res.json(); // esperado: [{home, away, scoreHome, scoreAway, minute, status}]
           render(data);
         } else {
           render(mock);
