@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Demo Placar ao Vivo — LOTECA</title>
-  <meta name="description" content="Demo de placar ao vivo para lotecaonline.com.br com atualização automática.">
+  <meta name="description" content="Demo de placar ao vivo para lotecaonline.com.br com atualização automática e som de gol.">
   <style>
     :root { font-family: system-ui, Roboto, Arial, sans-serif; }
     body { margin: 0; background: #0f172a; color: #e2e8f0; }
@@ -14,15 +14,21 @@
     h1 { margin:0; font-size:1.25rem; }
     .badge { background:#1d4ed8; padding:2px 8px; border-radius:999px; font-size:.75rem; }
 
+    .container{max-width:1000px;margin:0 auto;padding:0 16px}
+
     .card { margin:20px; padding:16px; background:#111827; border:1px solid #1f2937; border-radius:16px; }
     .note { opacity:.85; margin:.5rem 0 1rem; }
 
     .btn {
       display:inline-block; padding:10px 14px; border-radius:10px;
       border:1px solid #1f2937; background:#1d4ed8; color:#fff;
-      text-decoration:none; font-weight:600;
+      text-decoration:none; font-weight:600; cursor:pointer;
     }
     .btn:hover { filter:brightness(1.05); }
+
+    .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+    .label { font-size:.95rem; opacity:.9; }
+    input[type="range"] { width:180px; }
 
     .matches { list-style:none; padding:0; margin:0; display:grid; gap:12px; }
     .match { display:flex; justify-content:space-between; align-items:center; gap:10px;
@@ -41,53 +47,103 @@
 </head>
 <body>
   <header class="topbar">
-    <h1>Placar ao Vivo (Demo)</h1>
-    <span class="badge">versão demo</span>
+    <div class="container">
+      <h1>Placar ao Vivo (Demo) <span class="badge">versão demo</span></h1>
+    </div>
   </header>
 
-  <!-- Sem iframe: cartão limpo com CTA para abrir o site oficial -->
-  <section class="card">
-    <h2>Placar oficial</h2>
-    <p class="note">
-      O site oficial não permite ser exibido dentro de outros sites. Clique abaixo para abrir em nova aba:
-    </p>
-    <p>
-      <a class="btn" href="https://www.lotecaonline.com.br/" target="_blank" rel="noopener">
-        Abrir placar oficial
-      </a>
-    </p>
-  </section>
+  <div class="container">
+    <!-- CTA para abrir o site oficial -->
+    <section class="card">
+      <h2>Placar oficial</h2>
+      <p class="note">
+        O site oficial não permite ser exibido dentro de outros sites. Clique abaixo para abrir em nova aba:
+      </p>
+      <p>
+        <a class="btn" href="https://www.lotecaonline.com.br/" target="_blank" rel="noopener">
+          Abrir placar oficial
+        </a>
+      </p>
+    </section>
 
-  <!-- Lista que será atualizada pelo JS (mock ou API) -->
-  <section class="card">
-    <h2>Lista de partidas (Atualiza a cada 30s)</h2>
-    <ul id="matches" class="matches"></ul>
-    <div id="last-update" class="last-update"></div>
-  </section>
+    <!-- Preferências: som e volume -->
+    <section class="card">
+      <h2>Preferências</h2>
+      <div class="row">
+        <button id="enable-sound" class="btn">🔊 Ativar som</button>
+        <label class="label"><input type="checkbox" id="sound-enabled" /> Tocar som quando sair gol</label>
+        <label class="label">Volume: <input type="range" id="volume" min="0" max="100" value="60" /></label>
+        <button id="simulate-goal" class="btn">⚽ Simular gol</button>
+      </div>
+      <p class="note">Por políticas do navegador, é preciso clicar em “Ativar som” uma vez para permitir áudio.</p>
+    </section>
 
-  <footer class="footer">
-    <small>Demo para <a href="https://www.lotecaonline.com.br/" target="_blank" rel="noreferrer">lotecaonline.com.br</a></small>
-  </footer>
+    <!-- Lista de partidas -->
+    <section class="card">
+      <h2>Lista de partidas (Atualiza a cada 30s)</h2>
+      <ul id="matches" class="matches"></ul>
+      <div id="last-update" class="last-update"></div>
+    </section>
+
+    <footer class="footer">
+      <small>Demo para <a href="https://www.lotecaonline.com.br/" target="_blank" rel="noreferrer">lotecaonline.com.br</a></small>
+    </footer>
+  </div>
 
   <script>
     // ===== CONFIG =====
-    // Quando tiver um endpoint (Cloudflare Worker/API), defina USE_WORKER = true
-    // e coloque a URL no WORKER_URL.
-    const USE_WORKER = false;
-    const WORKER_URL = "https://SEU-WORKER.cloudflare.workers.dev/placar"; // ajuste quando for usar API
+    const USE_WORKER = false; // quando tiver um endpoint real, mude para true
+    const WORKER_URL = "https://SEU-WORKER.cloudflare.workers.dev/placar"; // ajuste quando usar API
     const REFRESH_MS = 30_000;
 
     // ===== MOCK (para demo imediata) =====
-    const mock = [
+    let mock = [
       { home:"Flamengo-RJ", away:"Palmeiras-SP", scoreHome:1, scoreAway:0, minute:"34'", status:"1ºT" },
-      { home:"Internacional-RS", away:"Sport-PE", scoreHome:0, scoreAway:0, minute:"INT", status:"Intervalo" },
-      { home:"Corinthians-SP", away:"Atlético-MG", scoreHome:2, scoreAway:2, minute:"—", status:"Final" },
-      { home:"Cruzeiro-MG", away:"Fortaleza-CE", scoreHome:0, scoreAway:0, minute:"—", status:"Hoje 20:00" }
+      { home:"Internacional-RS", away:"Sport-PE",   scoreHome:0, scoreAway:0, minute:"INT", status:"Intervalo" },
+      { home:"Corinthians-SP",   away:"Atlético-MG", scoreHome:2, scoreAway:2, minute:"—",  status:"Final" },
+      { home:"Cruzeiro-MG",      away:"Fortaleza-CE", scoreHome:0, scoreAway:0, minute:"—", status:"Hoje 20:00" }
     ];
 
     const elList = document.getElementById("matches");
     const elLast = document.getElementById("last-update");
+    const elEnableSound = document.getElementById("enable-sound");
+    const elToggleSound = document.getElementById("sound-enabled");
+    const elVolume = document.getElementById("volume");
+    const elSimulate = document.getElementById("simulate-goal");
 
+    // ===== ÁUDIO =====
+    let audioCtx = null;
+    let isSoundEnabled = false;
+    let volume = 0.6;
+
+    elEnableSound.addEventListener("click", async () => {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      try { await audioCtx.resume(); } catch {}
+      elEnableSound.textContent = "Som habilitado ✅";
+    });
+    elToggleSound.addEventListener("change", e => { isSoundEnabled = e.target.checked; });
+    elVolume.addEventListener("input", e => { volume = Number(e.target.value)/100; });
+
+    function playGoalSound(){
+      if (!audioCtx || !isSoundEnabled) return;
+      const now = audioCtx.currentTime;
+      const master = audioCtx.createGain();
+      master.gain.value = volume;
+      master.connect(audioCtx.destination);
+
+      // "chime" curto em duas notas
+      const o1 = audioCtx.createOscillator();
+      const o2 = audioCtx.createOscillator();
+      o1.type = "square";  o2.type = "sawtooth";
+      o1.frequency.setValueAtTime(880, now);     // A5
+      o2.frequency.setValueAtTime(1320, now);    // E6
+
+      o1.connect(master); o2.connect(master);
+      o1.start(now); o2.start(now);
+      o1.stop(now + 0.25); o2.stop(now + 0.25);
+    }
+
+    // ===== RENDER =====
     function render(matches){
       elList.innerHTML = "";
       matches.forEach(m=>{
@@ -104,20 +160,58 @@
       elLast.textContent = "Atualizado: " + new Date().toLocaleTimeString();
     }
 
+    // ===== DETECÇÃO DE GOLS =====
+    // Guarda a soma de gols anterior para cada partida
+    const previousScores = new Map(); // key "home|away" -> totalGols
+
+    function detectGoals(matches){
+      let goalHappened = false;
+      matches.forEach(m=>{
+        const key = `${m.home}|${m.away}`;
+        const total = Number(m.scoreHome||0) + Number(m.scoreAway||0);
+        const prev = previousScores.get(key);
+        if (prev !== undefined && total > prev) goalHappened = true;
+        previousScores.set(key, total);
+      });
+      if (goalHappened) playGoalSound();
+    }
+
+    // ===== CARREGAMENTO =====
+    function setLoading(){ elList.innerHTML = "<li class='match'>Carregando…</li>"; }
+    function setError(){ elList.innerHTML = "<li class='match'>Não foi possível atualizar agora. Tentando novamente…</li>"; }
+
     async function load(){
       try{
+        setLoading();
         if (USE_WORKER) {
           const res = await fetch(WORKER_URL, { cache:"no-store" });
+          if (!res.ok) throw new Error("HTTP " + res.status);
           const data = await res.json(); // esperado: [{home, away, scoreHome, scoreAway, minute, status}]
-          render(data);
+          detectGoals(data);
+          render(Array.isArray(data) && data.length ? data : mock);
         } else {
+          // Demo com mock
+          detectGoals(mock);
           render(mock);
         }
       } catch(e){
         console.error(e);
+        setError();
         render(mock);
       }
     }
+
+    // Botão "Simular gol" para demonstração
+    elSimulate.addEventListener("click", () => {
+      // escolhe uma partida aleatória e incrementa um gol
+      const i = Math.floor(Math.random() * mock.length);
+      if (Math.random() < 0.5) mock[i].scoreHome++; else mock[i].scoreAway++;
+      mock[i].status = "2ºT";
+      mock[i].minute = String( Math.min(90, (Number(mock[i].minute)||0) + 1) ) + "'";
+      // Força detecção e renderização
+      detectGoals(mock);
+      render(mock);
+    });
 
     load();
     setInterval(load, REFRESH_MS);
